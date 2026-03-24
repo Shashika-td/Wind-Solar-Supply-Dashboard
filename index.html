@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wind & Solar Energy Dashboard — Girton, Cambridge</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --wind: #2a9d8f; --solar: #e9c46a; --combined: #8b5cf6; --demand: #e76f51;
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #222536;
+    --border: rgba(255,255,255,0.07); --text: #e8eaf0; --muted: #7b8099;
+  }
+  body.light-mode {
+    --bg:#f8f9fc; --surface:#ffffff; --surface2:#f1f3f8;
+    --border:rgba(0,0,0,0.10); --text:#1a1d27; --muted:#5a6280;
+  }
+  body.light-mode .nav-btn.active { color:#1a1d27; }
+  body.light-mode .metric-value { color:#1a1d27; }
+  body.light-mode .chart-title { color:#1a1d27; }
+  body.light-mode .ctrl-val { color:#1a1d27; }
+  body.light-mode header h1 { color:#1a1d27; }
+  body.light-mode .demandSelect { background:#f1f3f8 !important; color:#1a1d27 !important; border:1px solid rgba(0,0,0,0.15) !important; }
+  body.light-mode .demandSelect option { background:#f1f3f8 !important; color:#1a1d27 !important; }
+  #themeToggle { position:fixed; bottom:18px; right:18px; z-index:999; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:20px; padding:6px 14px; font-size:11px; cursor:pointer; font-family:'DM Mono',monospace; transition:all 0.2s; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  header { padding: 2rem 2rem 1.25rem; border-bottom: 1px solid var(--border); }
+  .header-inner { max-width: 1200px; margin: 0 auto; }
+  header h1 { font-size: 1.5rem; font-weight: 600; color: #fff; margin-bottom: 4px; letter-spacing: -0.02em; }
+  header p { font-size: 0.8rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 10px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; margin-right: 6px; font-family: 'DM Mono', monospace; }
+  .bw { background: rgba(42,157,143,0.2); color: var(--wind); border: 1px solid rgba(42,157,143,0.3); }
+  .bs { background: rgba(233,196,106,0.2); color: var(--solar); border: 1px solid rgba(233,196,106,0.3); }
+  .bd { background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+  .main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }
+  .nav { display: flex; gap: 4px; margin-bottom: 1.5rem; background: var(--surface); padding: 4px; border-radius: 12px; border: 1px solid var(--border); flex-wrap: wrap; }
+  .nav-btn { flex: 1; min-width: 130px; padding: 8px 12px; border-radius: 8px; border: none; background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .nav-btn:hover { color: var(--text); background: var(--surface2); }
+  .nav-btn.active { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; }
+  .metric-label { font-size: 10px; color: var(--muted); margin-bottom: 5px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric-value { font-size: 1.5rem; font-weight: 600; color: #fff; line-height: 1; }  /* overridden in light mode above */
+  .metric-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .chart-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+  .chart-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 1rem; font-family: 'DM Mono', monospace; }
+  .controls { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; margin-bottom: 1.25rem; background: var(--surface2); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); }
+  .ctrl-group { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  .ctrl-group label { min-width: 140px; }
+  .turbineSelect {
+    background: #1e2433 !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    appearance: auto;
+    -webkit-appearance: auto;
+  }
+  .turbineSelect option {
+    background: #1e2433 !important;
+    color: #e2e8f0 !important;
+  }
+  body.light-mode .turbineSelect { background:#f1f3f8 !important; color:#1a1d27 !important; border:1px solid rgba(0,0,0,0.15) !important; }
+  body.light-mode .turbineSelect option { background:#f1f3f8 !important; color:#1a1d27 !important; }
+  .demandSelect {
+    background: #1e2433 !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    appearance: auto;
+    -webkit-appearance: auto;
+  }
+  .demandSelect option {
+    background: #1e2433 !important;
+    color: #e2e8f0 !important;
+  }
+  input[type=range] { width: 110px; accent-color: var(--wind); cursor: pointer; }
+  .ctrl-val { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: #fff; min-width: 60px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .leg-line { width: 18px; height: 3px; border-radius: 2px; }
+  .leg-box { width: 10px; height: 10px; border-radius: 2px; }
+  .insight { margin-top: 1rem; padding: 10px 14px; background: var(--surface2); border-left: 3px solid var(--wind); border-radius: 0 8px 8px 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .insight strong { color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  footer { text-align: center; padding: 1.5rem; font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; border-top: 1px solid var(--border); margin-top: 1.5rem; line-height: 1.8; }
+  @media(max-width:700px) { .two-col { grid-template-columns: 1fr; } .nav-btn { min-width: 90px; font-size: 11px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <h1>Wind & Solar Energy Supply Dashboard</h1>
+    <p>Girton Junction, Cambridge · 52.229°N, 0.084°E · 10-year average 2015–2024</p>
+    <span class="badge bw" id="turbineBadge">Vestas V90-2.0 MW · 80m hub height</span>
+    <span class="badge bs">Solar PV · 35° tilt</span>
+    <span class="badge bd">renewables.ninja MERRA-2 · 87,600 hourly data points</span>
+  </div>
+</header>
+
+<div class="main">
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showTab('monthly')">Monthly CF</button>
+    <button class="nav-btn" onclick="showTab('stacked')">Monthly Supply</button>
+    <button class="nav-btn" onclick="showTab('hourly')">Hourly Supply</button>
+    <button class="nav-btn" onclick="showTab('worstwind')">Lowest Wind Month</button>
+    <button class="nav-btn" onclick="showTab('worstsolar')">Lowest Solar Month</button>
+    <button class="nav-btn" onclick="showTab('lowesttotal')">Lowest Total Month</button>
+    <button class="nav-btn" onclick="showTab('capex')">Capacity Optimisation</button>
+  </nav>
+
+  <!-- ===== TAB 1: MONTHLY CF ===== -->
+  <div id="tab-monthly" class="tab-content active">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect" >
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="cf_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title">Monthly capacity factor — wind vs solar (10-year average)</p>
+      <p class="chart-subtitle" id="cf_subtitle">Average CF (%) per month · 2015–2024 · renewables.ninja MERRA-2 · Girton, Cambridge</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind CF (%)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar CF (%)</span>
+      </div>
+      <div style="position:relative;width:100%;height:300px"><canvas id="monthlyChart"></canvas></div>
+      <div class="insight" id="cf_insight"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: STACKED MONTHLY SUPPLY ===== -->
+  <div id="tab-stacked" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Wind installed capacity (MW)</label>
+        <input type="range" min="2" max="50" step="2" value="30" id="sm_windMW" oninput="syncAll('wind',this.value)">
+        <span class="ctrl-val" id="sm_windVal">30 MW <span style="font-size:10px;color:var(--muted)">(15 turbines)</span></span>
+      </div>
+      <div class="ctrl-group">
+        <label>Solar installed capacity (MW)</label>
+        <input type="range" min="0.5" max="50" step="0.5" value="20" id="sm_solarMW" oninput="syncAll('solar',this.value)" >
+        <span class="ctrl-val" id="sm_solarVal">20 MW</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select id="demandSelect" class="demandSelect" onchange="syncDemand(this.value)" >
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect" >
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="stacked_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title">Average daily energy output by month — stacked wind + solar (MWh/day)</p>
+      <p class="chart-subtitle">Solar stacked on top of wind · dashed line = daily demand (2060 profile)</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind (MWh/day)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar (MWh/day)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--demand);border-top:2px dashed var(--demand);background:transparent"></span>Daily demand</span>
+      </div>
+      <div style="position:relative;width:100%;height:320px"><canvas id="stackedChart"></canvas></div>
+      <div class="insight" id="stacked_insight"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 3: HOURLY SUPPLY ===== -->
+  <div id="tab-hourly" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Wind installed capacity (MW)</label>
+        <input type="range" min="2" max="50" step="2" value="30" id="h_windMW" oninput="syncAll('wind',this.value)">
+        <span class="ctrl-val" id="h_windVal">30 MW <span style="font-size:10px;color:var(--muted)">(15 turbines)</span></span>
+      </div>
+      <div class="ctrl-group">
+        <label>Solar installed capacity (MW)</label>
+        <input type="range" min="0.5" max="50" step="0.5" value="20" id="h_solarMW" oninput="syncAll('solar',this.value)">
+        <span class="ctrl-val" id="h_solarVal">20 MW</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select onchange="syncDemand(this.value)" class="demandSelect" >
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect" >
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="hourly_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title">Average hourly supply vs demand — annual average (MWh/hr)</p>
+      <p class="chart-subtitle">10-year averaged hourly profiles · solar stacked on wind · vs 2060 demand</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--combined)"></span>Combined (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--demand);border-style:dashed"></span>Demand (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:rgba(42,157,143,0.25)"></span>Surplus</span>
+        <span class="legend-item"><span class="leg-box" style="background:rgba(231,111,81,0.2)"></span>Deficit</span>
+      </div>
+      <div style="position:relative;width:100%;height:320px"><canvas id="hourlyChart"></canvas></div>
+      <div class="insight" id="hourly_insight"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 4: WORST WIND MONTH (JUN) ===== -->
+  <div id="tab-worstwind" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Wind installed capacity (MW)</label>
+        <input type="range" min="2" max="50" step="2" value="30" id="ww_windMW" oninput="syncAll('wind',this.value)">
+        <span class="ctrl-val" id="ww_windVal">30 MW <span style="font-size:10px;color:var(--muted)">(15 turbines)</span></span>
+      </div>
+      <div class="ctrl-group">
+        <label>Solar installed capacity (MW)</label>
+        <input type="range" min="0.5" max="50" step="0.5" value="20" id="ww_solarMW" oninput="syncAll('solar',this.value)">
+        <span class="ctrl-val" id="ww_solarVal">20 MW</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select onchange="syncDemand(this.value)" class="demandSelect" >
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect" >
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="ww_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title">Lowest wind month — June (avg wind CF: 27.5%, 10-yr avg)</p>
+      <p class="chart-subtitle">Average hourly supply vs demand during the lowest wind month · solar compensates strongly in June</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--combined)"></span>Combined (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--demand);border-style:dashed"></span>Demand (MWh/hr)</span>
+      </div>
+      <div style="position:relative;width:100%;height:320px"><canvas id="wwChart"></canvas></div>
+      <div class="insight"><strong>Key finding — June (lowest wind month):</strong> Wind drops to only 27.5% avg CF, but June is also the <strong>highest solar month</strong> (20.5% CF) — solar peaks at 57.9% CF at midday. The combined supply curve closely tracks demand during daylight hours, demonstrating strong seasonal complementarity. Night-time remains wind-only, highlighting the need for battery storage to bridge the gap.</div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 5: WORST SOLAR MONTH (DEC) ===== -->
+  <div id="tab-worstsolar" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Wind installed capacity (MW)</label>
+        <input type="range" min="2" max="50" step="2" value="30" id="ws_windMW" oninput="syncAll('wind',this.value)">
+        <span class="ctrl-val" id="ws_windVal">30 MW <span style="font-size:10px;color:var(--muted)">(15 turbines)</span></span>
+      </div>
+      <div class="ctrl-group">
+        <label>Solar installed capacity (MW)</label>
+        <input type="range" min="0.5" max="50" step="0.5" value="20" id="ws_solarMW" oninput="syncAll('solar',this.value)">
+        <span class="ctrl-val" id="ws_solarVal">20 MW</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select onchange="syncDemand(this.value)" class="demandSelect" >
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect" >
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="ws_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title">Lowest solar month — December (avg solar CF: 2.7%, 10-yr avg)</p>
+      <p class="chart-subtitle">Average hourly supply vs demand during the lowest solar month · wind is dominant in December</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--combined)"></span>Combined (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--demand);border-style:dashed"></span>Demand (MWh/hr)</span>
+      </div>
+      <div style="position:relative;width:100%;height:320px"><canvas id="wsChart"></canvas></div>
+      <div class="insight"><strong>Key finding — December (lowest solar month):</strong> Solar contributes almost nothing — only 2 hours of meaningful output with a peak of just 15.5% CF at midday. However, <strong>wind more than compensates</strong> — December avg wind CF is 44.5%, one of the highest months. At 30MW wind, output exceeds demand for most of the day, generating surplus for grid export revenue. This confirms wind as the essential backbone of the power island in winter.</div>
+    </div>
+  </div>
+
+
+  <!-- ===== TAB 6: LOWEST TOTAL OUTPUT MONTH (DYNAMIC) ===== -->
+  <div id="tab-lowesttotal" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Wind installed capacity (MW)</label>
+        <input type="range" min="2" max="50" step="2" value="30" id="lt_windMW" oninput="syncAll('wind',this.value)">
+        <span class="ctrl-val" id="lt_windVal">30 MW <span style="font-size:10px;color:var(--muted)">(15 turbines)</span></span>
+      </div>
+      <div class="ctrl-group">
+        <label>Solar installed capacity (MW)</label>
+        <input type="range" min="0.5" max="50" step="0.5" value="20" id="lt_solarMW" oninput="syncAll('solar',this.value)">
+        <span class="ctrl-val" id="lt_solarVal">20 MW</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select onchange="syncDemand(this.value)" class="demandSelect">
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect">
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="metrics" id="lt_metrics"></div>
+    <div class="chart-card">
+      <p class="chart-title" id="lt_title">Lowest total output month — dynamic</p>
+      <p class="chart-subtitle" id="lt_subtitle">Average hourly supply vs demand · month determined by current wind + solar split</p>
+      <div class="legend">
+        <span class="legend-item"><span class="leg-box" style="background:var(--wind)"></span>Wind (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:var(--solar)"></span>Solar (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--combined)"></span>Combined (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-line" style="background:var(--demand);border-style:dashed"></span>Demand (MWh/hr)</span>
+        <span class="legend-item"><span class="leg-box" style="background:rgba(42,157,143,0.25)"></span>Surplus</span>
+        <span class="legend-item"><span class="leg-box" style="background:rgba(231,111,81,0.2)"></span>Deficit</span>
+      </div>
+      <div style="position:relative;width:100%;height:320px"><canvas id="ltChart"></canvas></div>
+      <div class="insight" id="lt_insight"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 7: COST & CAPEX ===== -->
+  <div id="tab-capex" class="tab-content">
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>Demand scenario (2060)</label>
+        <select onchange="syncDemand(this.value)" class="demandSelect">
+          <option value="center">Centre — 195.4 MWh/day</option>
+          <option value="lower">Lower — 133.8 MWh/day</option>
+          <option value="upper">Upper — 257.3 MWh/day</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>Turbine model</label>
+        <select onchange="syncTurbine(this.value)" class="turbineSelect">
+          <option value="v90">Vestas V90-2.0 MW (IEC IIA/IIIA)</option>
+          <option value="v110">Vestas V110-2.0 MW (IEC IIIA)</option>
+        </select>
+      </div>
+    </div>
+    <div class="chart-card" style="padding:1.2rem">
+      <p class="chart-title" id="capex_title">Wind-solar capacity optimisation — feasibility, cost and land</p>
+      <p class="chart-subtitle" id="capex_subtitle">Centre demand 195.4 MWh/day satisfied in every month · CAPEX + solar land acquisition contours · land @ £20,000/ha (Cambridgeshire arable)</p>
+      <div id="opt_readout" style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:14px;margin-bottom:8px;font-size:11px;color:var(--muted);flex-wrap:wrap;align-items:center">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:22px;height:2.5px;background:#378ADD;display:inline-block"></span>Feasibility boundary (all 12 months)</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:0;border-top:2px solid #7F77DD;display:inline-block"></span>Total cost contours — CAPEX + land (£M)</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:20px;height:0;border-top:2px dashed rgba(29,158,117,0.8);display:inline-block"></span>Solar land contours (ha)</span>
+      </div>
+      <div style="position:relative;width:100%;height:420px"><canvas id="optChart" style="cursor:crosshair"></canvas></div>
+      <div class="insight" id="capex_insight">Move cursor over chart to explore combinations. <strong>Click any point on the blue boundary line</strong> to apply that wind + solar combination to all tabs. The blue line is the feasibility boundary — left of it, at least one month fails to meet 195.4 MWh/day demand. Diagonal lines are total cost contours (CAPEX + land acquisition). Horizontal dashed lines show solar land in hectares.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Data: renewables.ninja · Vestas V90 2MW · MERRA-2 · 10-year average 2015–2024 · Girton, Cambridge (52.229°N, 0.084°E) · 80m hub height<br>
+  Cost data: Arup / DESNZ (2024) Renewable Energy Generation Cost and Technical Assumptions – Onshore Wind and Solar PV · DESNZ Electricity Generation Costs 2025<br>
+  Cite wind/solar data: Staffell &amp; Pfenninger (2016) Energy 114:1224–1239 · Pfenninger &amp; Staffell (2016) Energy 114:1251–1265<br>
+  Dashboard prepared for FIBE3 Mini Project — AtkinsRéalis / University of Cambridge
+</footer>
+<button id="themeToggle" onclick="toggleTheme()">☀ Light mode</button>
+<script>
+function toggleTheme(){
+  const body = document.body;
+  const btn = document.getElementById('themeToggle');
+  body.classList.toggle('light-mode');
+  btn.textContent = body.classList.contains('light-mode') ? '🌙 Dark mode' : '☀ Light mode';
+  // Destroy and rebuild opt chart so grid/tick/label colours update
+  if(optChartInst){ optChartInst.destroy(); optChartInst=null; }
+  // Redraw all charts with correct colours
+  updateCF(); updateStacked(); updateHourly(); updateWW(); updateWS(); updateLT(); updateCapex();
+}
+</script>
+
+<script>
+// ===================== GLOBAL SYNC =====================
+// Single source of truth for capacity values
+let globalWindMW = 30;
+let globalSolarMW = 20;
+
+const windSliders  = ['sm_windMW',  'h_windMW',  'ww_windMW',  'ws_windMW',  'lt_windMW',  'c_windMW'];
+const solarSliders = ['sm_solarMW', 'h_solarMW', 'ww_solarMW', 'ws_solarMW', 'lt_solarMW', 'c_solarMW'];
+
+function syncTurbine(turbine) {
+  globalTurbine = turbine;
+  const p = turbineProfiles[turbine];
+  windMonthly.splice(0, 12, ...p.windMonthly);
+  windHourly.splice(0, 24, ...p.windHourly);
+  wwWindH.splice(0, 24, ...p.wwWindH);
+  wsWindH.splice(0, 24, ...p.wsWindH);
+  // Update wCF_m so capacity optimisation uses the correct turbine's monthly CFs
+  wCF_m.splice(0, 12, ...p.windMonthly);
+  document.querySelectorAll('.turbineSelect').forEach(el => el.value = turbine);
+  const badge = document.getElementById('turbineBadge'); if(badge) badge.textContent = p.label + ' · 80m hub height';
+  // Update worst wind month title
+  const wwCF = p.windMonthly[5].toFixed(1);
+  document.querySelectorAll('.ww-cf-label').forEach(el => el.textContent = wwCF + '%');
+  // Update worst solar month title
+  const wsCF = p.windMonthly[11].toFixed(1);
+  document.querySelectorAll('.ws-cf-label').forEach(el => el.textContent = wsCF + '%');
+  updateCF(); updateStacked(); updateHourly(); updateWW(); updateWS(); updateLT(); updateCapex();
+}
+
+function syncDemand(scenario) {
+  globalDemandScenario = scenario;
+  demand = demandProfiles[scenario];
+  dailyDemand = demand.reduce((a,b)=>a+b,0);
+  // sync all dropdowns if duplicated
+  document.querySelectorAll('.demandSelect, #demandSelect').forEach(el=>el.value=scenario);
+  updateStacked();
+  updateHourly();
+  updateWW();
+  updateWS();
+  updateLT();
+  updateCapex();
+}
+
+function syncAll(type, value) {
+  if (type === 'wind') {
+    globalWindMW = +value;
+    windSliders.forEach(id => { const el = document.getElementById(id); if(el) el.value = globalWindMW; });
+  } else {
+    globalSolarMW = +value;
+    solarSliders.forEach(id => { const el = document.getElementById(id); if(el) el.value = globalSolarMW; });
+  }
+  // Update all tabs — the update functions read from global values
+  updateStacked();
+  updateHourly();
+  updateWW();
+  updateWS();
+  updateLT();
+  updateCapex();
+}
+
+// ===================== DATA =====================
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const hours  = Array.from({length:24},(_,i)=>i+':00');
+const demandProfiles = {
+  center: [1.211512536,0.996566763,0.996566763,0.996566763,1.602323031,5.002374341,13.03353002,16.04277083,15.02666355,12.01742273,10.02428921,9.613938186,9.613938186,10.02428921,11.62661224,13.61974576,15.02666355,15.63241981,11.02085597,8.011615155,6.018481628,4.005807577,2.598889794,1.602323031],
+  lower:  [0.829495,0.682326,0.682326,0.682326,1.097074,3.425011,8.92376,10.98412,10.28841,8.228055,6.863402,6.582444,6.582444,6.863402,7.960476,9.325129,10.28841,10.70316,7.545728,5.48537,4.120717,2.742685,1.7794,1.097074],
+  upper:  [1.59578,1.312657,1.312657,1.312657,2.110547,6.589025,17.1675,21.13121,19.79281,15.8291,13.20379,12.66328,12.66328,13.20379,15.31434,17.93965,19.79281,20.5907,14.51645,10.55274,7.927421,5.276368,3.423204,2.110547]
+};
+let globalDemandScenario = 'center';
+let demand = demandProfiles.center;
+let dailyDemand = demand.reduce((a,b)=>a+b,0);
+const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+// ── Turbine profiles ─────────────────────────────────────────────────────────
+const turbineProfiles = {
+  v90: {
+    label: 'Vestas V90-2.0 MW',
+    annualCF: 36.23,
+    windMonthly:  [43.22,47.28,41.75,32.37,28.91,27.51,28.04,30.29,32.15,38.89,40.45,44.54],
+    windHourly:   [35.67,34.98,34.52,34.16,33.68,32.48,31.86,32.43,33.56,34.71,35.95,37.37,38.36,38.75,38.69,38.58,38.39,37.99,37.98,38.54,38.66,38.19,37.43,36.55],
+    wwWindH:      [29.12,28.19,27.45,26.74,25.81,22.49,21.70,24.45,26.64,27.87,28.84,29.83,30.80,31.55,32.01,32.03,31.41,29.78,28.91,31.03,32.80,32.40,31.57,30.47],
+    wsWindH:      [42.30,41.81,41.64,41.81,42.13,42.84,43.67,44.05,44.20,42.98,41.96,42.80,44.35,44.84,45.40,47.78,49.59,49.33,48.24,47.14,46.33,45.58,44.58,43.58],
+  },
+  v110: {
+    label: 'Vestas V110-2.0 MW',
+    annualCF: 47.67,
+    windMonthly:  [54.67,58.85,53.40,43.79,39.76,38.28,38.89,41.66,43.72,51.52,52.22,56.01],
+    windHourly:   [47.87,47.00,46.40,45.90,45.24,43.56,42.56,43.07,44.21,45.33,46.51,47.93,48.95,49.40,49.46,49.59,49.68,49.57,49.94,50.96,51.33,50.86,49.97,48.91],
+    wwWindH:      [39.89,39.15,38.57,37.85,35.26,29.28,30.31,32.94,35.00,36.43,37.39,38.41,39.35,40.16,40.84,41.19,40.74,39.19,37.75,39.55,42.88,43.46,42.30,40.89],
+    wsWindH:      [53.80,53.11,52.87,53.10,53.47,54.28,55.17,55.62,55.82,54.37,52.99,53.66,55.02,55.37,56.05,58.99,61.32,61.30,60.38,59.40,58.56,57.72,56.52,55.28],
+  }
+};
+let globalTurbine = 'v90';
+
+// Active wind arrays — updated by syncTurbine()
+let windMonthly  = [...turbineProfiles.v90.windMonthly];
+let windHourly   = [...turbineProfiles.v90.windHourly];
+let wwWindH      = [...turbineProfiles.v90.wwWindH];
+let wsWindH      = [...turbineProfiles.v90.wsWindH];
+
+// Solar arrays — same for both turbines
+const solarMonthly = [4.33,7.71,12.21,17.74,19.64,20.48,19.86,18.66,15.42,9.99,5.04,2.70];
+const combinedMonthly = windMonthly.map((w,i)=>+((w+solarMonthly[i])/2).toFixed(2));
+
+const windHourlyArr  = windHourly; // alias for legacy refs
+const solarHourly = [0,0,0,0,0.16,1.24,5.40,12.82,22.08,31.75,39.40,43.37,43.01,38.81,31.02,21.01,11.74,4.90,1.23,0.13,0,0,0,0];
+
+let wwSolarH = [0,0,0,0,0.16,3.41,12.91,26.20,38.83,48.77,55.42,57.88,56.66,52.60,45.27,34.93,23.18,11.65,3.38,0.16,0,0,0,0];
+let wsSolarH = [0,0,0,0,0,0,0,0,0.35,4.43,9.95,14.14,15.54,12.98,6.74,0.71,0,0,0,0,0,0,0,0];
+
+// CAPEX/OPEX constants (DESNZ/Arup 2024)
+const WIND_CAPEX_PER_KW = 1588;  // £/kW mid estimate
+const SOLAR_CAPEX_PER_KW = 659;  // £/kW mid estimate
+const WIND_OPEX_PER_MW = 22;     // £k/MW/yr
+const SOLAR_OPEX_PER_MW = 36.5;  // £k/MW/yr
+
+function isLightMode(){ return document.body.classList.contains('light-mode'); }
+function gridColor(){ return isLightMode() ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.05)'; }
+function tickColor(){ return isLightMode() ? '#4a5270' : '#7b8099'; }
+function getBaseOpts(){
+  const gc = gridColor(), tc = tickColor();
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ ticks:{ color:tc, autoSkip:false, maxRotation:0, font:{size:10} }, grid:{ color:gc } },
+      y:{ ticks:{ color:tc, font:{size:10} }, grid:{ color:gc } }
+    }
+  };
+}
+// kept for backward compat where tickColor is referenced directly in scale titles
+const baseOpts = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{color:'#7b8099',autoSkip:false,maxRotation:0,font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'} }, y:{ ticks:{color:'#7b8099',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'} } } };
+
+// ===== TAB 1: MONTHLY CF =====
+let monthlyChart;
+function updateCF(){
+  const p = turbineProfiles[globalTurbine];
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Metrics
+  const annualWindCF = windMonthly.reduce((a,b)=>a+b,0)/12;
+  const bestWindIdx  = windMonthly.indexOf(Math.max(...windMonthly));
+  const worstWindIdx = windMonthly.indexOf(Math.min(...windMonthly));
+  const bestSolIdx   = solarMonthly.indexOf(Math.max(...solarMonthly));
+  const worstSolIdx  = solarMonthly.indexOf(Math.min(...solarMonthly));
+
+  document.getElementById('cf_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Wind annual CF</p><p class="metric-value" style="color:var(--wind)">${p.annualCF.toFixed(1)}%</p><p class="metric-sub">10-yr avg 2015–2024</p></div>
+    <div class="metric"><p class="metric-label">Solar annual CF</p><p class="metric-value" style="color:var(--solar)">12.8%</p><p class="metric-sub">10-yr avg 2015–2024</p></div>
+    <div class="metric"><p class="metric-label">Highest wind month</p><p class="metric-value" style="color:var(--wind)">${monthNames[bestWindIdx]}</p><p class="metric-sub">${windMonthly[bestWindIdx].toFixed(1)}% avg CF</p></div>
+    <div class="metric"><p class="metric-label">Highest solar month</p><p class="metric-value" style="color:var(--solar)">Jun</p><p class="metric-sub">20.5% avg CF</p></div>
+    <div class="metric"><p class="metric-label">Lowest wind month</p><p class="metric-value" style="color:var(--demand)">${monthNames[worstWindIdx]}</p><p class="metric-sub">${windMonthly[worstWindIdx].toFixed(1)}% avg CF</p></div>
+    <div class="metric"><p class="metric-label">Lowest solar month</p><p class="metric-value" style="color:var(--demand)">Dec</p><p class="metric-sub">2.7% avg CF</p></div>
+  `;
+
+  document.getElementById('cf_insight').innerHTML = `<strong>Seasonal complementarity (${p.label}):</strong> Wind peaks in ${monthNames[bestWindIdx]} (${windMonthly[bestWindIdx].toFixed(1)}%) when solar is nearly zero (Dec 2.7%). Solar peaks in Jun (20.5%) when wind is weakest (${monthNames[worstWindIdx]}: ${windMonthly[worstWindIdx].toFixed(1)}%). The two technologies are anti-correlated by season — the core argument for a mixed power island at this site.`;
+
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{ labels:months, datasets:[
+      { label:'Wind CF', data:windMonthly, backgroundColor:'rgba(42,157,143,0.75)', borderRadius:4 },
+      { label:'Solar CF', data:solarMonthly, backgroundColor:'rgba(233,196,106,0.75)', borderRadius:4 },
+    ]},
+    plugins:[{
+      id:'rightBorder',
+      afterDraw(chart){
+        const {ctx,chartArea:{top,bottom,right}}=chart;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(right,top);
+        ctx.lineTo(right,bottom);
+        ctx.lineWidth=1;
+        ctx.strokeStyle=gridColor();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }],
+    options:{...getBaseOpts(), scales:{...getBaseOpts().scales, y:{...getBaseOpts().scales.y, title:{display:true,text:'CF (%)',color:tickColor(),font:{size:11}}, ticks:{...getBaseOpts().scales.y.ticks,callback:v=>v+'%'}}}}
+  });
+}
+
+// ===== HELPERS =====
+function turbineCount(mw){ return Math.round(mw/2); }
+function windLabel(mw){ return `${mw} MW (${turbineCount(mw)} turbines × 2MW)`; }
+
+function makeStackedChartData(wMW, sMW){
+  const wOut = windMonthly.map((cf,i)  => +(cf/100 * wMW * daysInMonth[i] * 24).toFixed(1));
+  const sOut = solarMonthly.map((cf,i) => +(cf/100 * sMW * daysInMonth[i] * 24).toFixed(1));
+  const wDaily = wOut.map((v,i) => +(v/daysInMonth[i]).toFixed(1));
+  const sDaily = sOut.map((v,i) => +(v/daysInMonth[i]).toFixed(1));
+  return { wDaily, sDaily };
+}
+
+function makeHourlyData(cfArr, mw){ return cfArr.map(cf => +(cf/100*mw).toFixed(2)); }
+
+// ===== TAB 2: STACKED MONTHLY =====
+let stackedChart;
+function updateStacked(){
+  const wMW = globalWindMW;
+  const sMW = globalSolarMW;
+  document.getElementById('sm_windVal').innerHTML = `${wMW} MW <span style="font-size:10px;color:var(--muted)">(${turbineCount(wMW)} turbines)</span>`;
+  document.getElementById('sm_solarVal').textContent = `${sMW} MW`;
+
+  const { wDaily, sDaily } = makeStackedChartData(wMW, sMW);
+  const totalDaily = wDaily.map((w,i)=>+(w+sDaily[i]).toFixed(1));
+  const bestM = totalDaily.indexOf(Math.max(...totalDaily));
+  const worstM = totalDaily.indexOf(Math.min(...totalDaily));
+
+  document.getElementById('stacked_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Highest month output</p><p class="metric-value" style="color:var(--wind)">${totalDaily[bestM]}</p><p class="metric-sub">MWh/day · ${months[bestM]}</p></div>
+    <div class="metric"><p class="metric-label">Lowest month output</p><p class="metric-value" style="color:var(--demand)">${totalDaily[worstM]}</p><p class="metric-sub">MWh/day · ${months[worstM]}</p></div>
+    <div class="metric"><p class="metric-label">Daily demand</p><p class="metric-value">${dailyDemand.toFixed(1)}</p><p class="metric-sub">MWh/day · 2060 ${globalDemandScenario}</p></div>
+    <div class="metric"><p class="metric-label">Wind + Solar CAPEX</p><p class="metric-value" style="color:var(--text)">£${((wMW*1000*1588 + sMW*1000*659)/1e6).toFixed(2)}M</p><p class="metric-sub">excl. battery storage</p></div>
+  `;
+  document.getElementById('stacked_insight').innerHTML = `<strong>Monthly supply:</strong> Combined output ranges from <strong>${totalDaily[worstM]} MWh/day</strong> in ${months[worstM]} to <strong>${totalDaily[bestM]} MWh/day</strong> in ${months[bestM]}. Daily demand is ${dailyDemand.toFixed(1)} MWh. ${totalDaily.filter(v=>v>=dailyDemand).length === 12 ? 'All 12 months exceed daily demand — strong case for a self-sufficient power island.' : `${totalDaily.filter(v=>v<dailyDemand).length} month(s) fall below daily demand — battery storage or grid import required in those months.`}`;
+
+  if(stackedChart) stackedChart.destroy();
+  stackedChart = new Chart(document.getElementById('stackedChart'),{
+    type:'bar',
+    data:{ labels:months, datasets:[
+      { label:'Wind', data:wDaily, backgroundColor:'rgba(42,157,143,0.8)', borderRadius:3, stack:'s' },
+      { label:'Solar', data:sDaily, backgroundColor:'rgba(233,196,106,0.8)', borderRadius:3, stack:'s' },
+      { label:'Demand', data:Array(12).fill(+dailyDemand.toFixed(1)), type:'line', borderColor:'#e76f51', borderDash:[6,4], borderWidth:2, pointRadius:0, backgroundColor:'transparent' }
+    ]},
+    options:{...getBaseOpts(), scales:{...getBaseOpts().scales, y:{...getBaseOpts().scales.y, title:{display:true,text:'MWh/day',color:tickColor(),font:{size:11}}}}}
+  });
+}
+
+// ===== TAB 3: HOURLY =====
+let hourlyChart;
+
+// Shared shading plugin — works in pixel space directly, no index mapping
+function makeShadingPlugin(combinedLabel, demandLabel){
+  return {
+    id:'shading_'+combinedLabel,
+    afterDraw(chart){
+      const ctx   = chart.ctx;
+      const yAxis = chart.scales.y;
+      const cDS   = chart.data.datasets.find(d=>d.label===combinedLabel);
+      const dDS   = chart.data.datasets.find(d=>d.label===demandLabel);
+      if(!cDS||!dDS) return;
+
+      // Get pixel positions directly from chart metadata (exact, no rounding)
+      let cIdx=-1, dIdx=-1;
+      chart.data.datasets.forEach((d,i)=>{ if(d.label===combinedLabel) cIdx=i; if(d.label===demandLabel) dIdx=i; });
+      if(cIdx<0||dIdx<0) return;
+      const meta_c = chart.getDatasetMeta(cIdx);
+      const meta_d = chart.getDatasetMeta(dIdx);
+      if(!meta_c.data.length) return;
+
+      const n = meta_c.data.length;
+
+      const pts = []; // {px, cy, dy, isCross}
+      for(let i=0;i<n;i++){
+        if(i>0){
+          const px0=meta_c.data[i-1].x, px1=meta_c.data[i].x;
+          const cy0=meta_c.data[i-1].y, cy1=meta_c.data[i].y;
+          const dy0=meta_d.data[i-1].y, dy1=meta_d.data[i].y;
+          const diff0=cy0-dy0, diff1=cy1-dy1;
+          if(diff0*diff1 < 0){
+            const t = diff0/(diff0-diff1);
+            const crossPx = px0+t*(px1-px0);
+            const crossY  = cy0+t*(cy1-cy0);
+            pts.push({ px:crossPx, cy:crossY, dy:crossY, isCross:true });
+          }
+        }
+        pts.push({ px:meta_c.data[i].x, cy:meta_c.data[i].y, dy:meta_d.data[i].y, isCross:false });
+      }
+
+      function fillRegion(seg, color){
+        if(seg.length<2) return;
+        ctx.beginPath();
+        ctx.moveTo(seg[0].px, seg[0].cy);
+        seg.forEach(p=>ctx.lineTo(p.px, p.cy));
+        for(let k=seg.length-1;k>=0;k--) ctx.lineTo(seg[k].px, seg[k].dy);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      ctx.save();
+      let isSurplus = pts[0].cy <= pts[0].dy;
+      let seg = [pts[0]];
+      for(let i=1;i<pts.length;i++){
+        const p = pts[i];
+        if(p.isCross){
+          // exact crossover — close current region here, start new one
+          seg.push(p);
+          fillRegion(seg, isSurplus ? 'rgba(42,157,143,0.25)' : 'rgba(231,111,81,0.25)');
+          seg = [p];
+          isSurplus = !isSurplus;
+        } else {
+          seg.push(p);
+        }
+      }
+      fillRegion(seg, isSurplus ? 'rgba(42,157,143,0.25)' : 'rgba(231,111,81,0.25)');
+      ctx.restore();
+    }
+  };
+}
+
+function updateHourly(){
+  const wMW = globalWindMW;
+  const sMW = globalSolarMW;
+  document.getElementById('h_windVal').innerHTML = `${wMW} MW <span style="font-size:10px;color:var(--muted)">(${turbineCount(wMW)} turbines)</span>`;
+  document.getElementById('h_solarVal').textContent = `${sMW} MW`;
+
+  const wOut = makeHourlyData(windHourly, wMW);
+  const sOut = makeHourlyData(solarHourly, sMW);
+  const cOut = wOut.map((w,i)=>+(w+sOut[i]).toFixed(2));
+
+  // Daily total comparison (with battery storage assumption)
+  const totalDailyGen = wOut.reduce((a,b)=>a+b,0) + sOut.reduce((a,b)=>a+b,0);
+  const genDemandRatio = (totalDailyGen / dailyDemand * 100).toFixed(0);
+  const dailyExport = Math.max(0, totalDailyGen - dailyDemand).toFixed(1);
+
+  // Battery capacity = max hourly deficit gap (peak demand - min supply window)
+  // = the max energy needed to shift from surplus hours to deficit hours
+  let runningBalance = 0;
+  let minBalance = 0;
+  let maxBalance = 0;
+  cOut.forEach((c,i)=>{
+    runningBalance += (c - demand[i]);
+    if(runningBalance < minBalance) minBalance = runningBalance;
+    if(runningBalance > maxBalance) maxBalance = runningBalance;
+  });
+  const batteryCapacity = Math.abs(minBalance).toFixed(1);
+
+  // Battery sizing — correct sliding window method
+  // Finds max cumulative deficit in any continuous window (incl overnight wrap)
+  function calcBattery(wCF, sCF, wMW, sMW) {
+    const net = Array.from({length:24}, (_,h) => wCF[h]/100*wMW + sCF[h]/100*sMW - demand[h]);
+    const net2 = [...net, ...net]; // duplicate for wrap-around
+    let maxDeficit = 0, running = 0;
+    for (let i = 0; i < 48; i++) {
+      running += net2[i];
+      if (running < 0) { if (Math.abs(running) > maxDeficit) maxDeficit = Math.abs(running); }
+      else running = 0; // surplus recharges battery, reset
+    }
+    return maxDeficit.toFixed(1);
+  }
+  const battAvg       = calcBattery(windHourly,  solarHourly, wMW, sMW);
+  const battWorstWind = calcBattery(wwWindH,      wwSolarH,    wMW, sMW);
+
+  // Battery duration for avg profile (longest deficit window)
+  const avgBattDuration = (() => {
+    const net = Array.from({length:24},(_,h)=>windHourly[h]/100*wMW+solarHourly[h]/100*sMW-demand[h]);
+    let m=0,c=0; net.forEach(n=>{if(n<0){c++;if(c>m)m=c;}else c=0;}); return m||1;
+  })();
+  const avgBattPowerMW  = parseFloat(battAvg)>0 ? +(parseFloat(battAvg)/avgBattDuration).toFixed(2) : 0;
+  const avgBattCapex    = +(avgBattPowerMW*0.65).toFixed(2);
+  const windSolarCapex  = +((wMW*1000*1588+sMW*1000*659)/1e6).toFixed(2);
+  const hourlyTotalCapex = windSolarCapex;
+
+  const hourlyBalance = totalDailyGen - dailyDemand;
+  document.getElementById('hourly_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Daily wind output</p><p class="metric-value" style="color:var(--wind)">${wOut.reduce((a,b)=>a+b,0).toFixed(1)}</p><p class="metric-sub">MWh/day (avg)</p></div>
+    <div class="metric"><p class="metric-label">Daily solar output</p><p class="metric-value" style="color:var(--solar)">${sOut.reduce((a,b)=>a+b,0).toFixed(1)}</p><p class="metric-sub">MWh/day (avg)</p></div>
+    <div class="metric"><p class="metric-label">Total generation</p><p class="metric-value" style="color:var(--combined)">${totalDailyGen.toFixed(1)}</p><p class="metric-sub">MWh/day · wind + solar</p></div>
+    <div class="metric"><p class="metric-label">Total daily demand</p><p class="metric-value">${dailyDemand.toFixed(1)}</p><p class="metric-sub">MWh/day · 2060 ${globalDemandScenario}</p></div>
+    <div class="metric"><p class="metric-label">${hourlyBalance >= 0 ? 'Daily surplus' : 'Daily deficit'}</p><p class="metric-value" style="color:${hourlyBalance >= 0 ? '#2a9d8f' : '#e76f51'}">${Math.abs(hourlyBalance).toFixed(1)}</p><p class="metric-sub">${hourlyBalance >= 0 ? 'MWh → export/store ✓' : 'MWh → grid/battery'}</p></div>
+    <div class="metric"><p class="metric-label">Battery — avg profile</p><p class="metric-value" style="color:var(--solar)">${battAvg}</p><p class="metric-sub">MWh min capacity needed</p></div>
+    <div class="metric"><p class="metric-label">Wind + Solar CAPEX</p><p class="metric-value" style="color:var(--text)">£${hourlyTotalCapex}M</p><p class="metric-sub">excl. battery storage</p></div>
+  `;
+  document.getElementById('hourly_insight').innerHTML = `<strong>Daily energy balance (with battery storage):</strong> Total daily generation is <strong>${totalDailyGen.toFixed(1)} MWh</strong> vs demand of ${dailyDemand.toFixed(1)} MWh — a ratio of ${genDemandRatio}%. With a battery of <strong>${batteryCapacity} MWh</strong> to shift surplus generation to peak demand hours, the power island achieves full daily self-sufficiency. Average daily surplus available for grid export: <strong>${dailyExport} MWh/day</strong> — a significant commercial revenue stream.`;
+
+  if(hourlyChart) hourlyChart.destroy();
+
+  hourlyChart = new Chart(document.getElementById('hourlyChart'),{
+    type:'line',
+    plugins:[makeShadingPlugin('Combined','Demand')],
+    data:{ labels:hours, datasets:[
+      { label:'Wind', data:wOut, borderColor:'#2a9d8f', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Solar', data:sOut, borderColor:'#e9c46a', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Combined', data:cOut, borderColor:'#8b5cf6', borderWidth:2.5, pointRadius:0, tension:0, fill:false },
+      { label:'Demand', data:demand, borderColor:'#e76f51', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:0, fill:false }
+    ]},
+    options:{...getBaseOpts(),
+      plugins:{...getBaseOpts().plugins, tooltip:{ filter:ctx=>ctx.datasetIndex<=3, callbacks:{ label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} MWh/hr` }}},
+      scales:{...getBaseOpts().scales, y:{...getBaseOpts().scales.y, title:{display:true,text:'MWh / hour',color:tickColor(),font:{size:11}}}}
+    }
+  });
+}
+
+// ===== TAB 4: WORST WIND =====
+let wwChart;
+function updateWW(){
+  const wMW = globalWindMW;
+  const sMW = globalSolarMW;
+  document.getElementById('ww_windVal').innerHTML = `${wMW} MW <span style="font-size:10px;color:var(--muted)">(${turbineCount(wMW)} turbines)</span>`;
+  document.getElementById('ww_solarVal').textContent = `${sMW} MW`;
+  const wOut = makeHourlyData(wwWindH, wMW);
+  const sOut = makeHourlyData(wwSolarH, sMW);
+  const cOut = wOut.map((w,i)=>+(w+sOut[i]).toFixed(2));
+
+  // Use correct monthly CF values (index 5 = June) for accurate daily totals
+  const wwDailyWind  = +(windMonthly[5]/100 * wMW * 24).toFixed(1);
+  const wwDailySolar = +(solarMonthly[5]/100 * sMW * 24).toFixed(1);
+  const wwTotalGen   = +(wwDailyWind + wwDailySolar).toFixed(1);
+  const wwBalance    = wwTotalGen - dailyDemand;
+  const wwDailyDeficit = Math.max(0, dailyDemand - wwTotalGen).toFixed(1);
+  const wwCapex = +((globalWindMW * 1000 * 1588 + globalSolarMW * 1000 * 659) / 1e6).toFixed(2);
+
+  const wwBattery = (() => {
+    const net = Array.from({length:24}, (_,h) => wwWindH[h]/100*wMW + wwSolarH[h]/100*sMW - demand[h]);
+    const net2 = [...net,...net];
+    let maxD = 0, run = 0;
+    for (let i = 0; i < 48; i++) { run += net2[i]; if(run<0){if(Math.abs(run)>maxD)maxD=Math.abs(run);}else run=0; }
+    return maxD.toFixed(1);
+  })();
+
+  const wwBattDuration = (() => {
+    const net = Array.from({length:24}, (_,h) => wwWindH[h]/100*wMW + wwSolarH[h]/100*sMW - demand[h]);
+    let maxHrs=0, cur=0;
+    net.forEach(n=>{ if(n<0){cur++;if(cur>maxHrs)maxHrs=cur;}else cur=0; });
+    return maxHrs || 1;
+  })();
+  const wwBattPowerMW = wwBattery > 0 ? +(parseFloat(wwBattery)/wwBattDuration).toFixed(2) : 0;
+  const wwBattCapex   = +(wwBattPowerMW * 0.65).toFixed(2);
+  const wwTotalCapex  = wwCapex;
+
+  document.getElementById('ww_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Daily wind output</p><p class="metric-value" style="color:var(--wind)">${wwDailyWind}</p><p class="metric-sub">MWh/day · June avg</p></div>
+    <div class="metric"><p class="metric-label">Daily solar output</p><p class="metric-value" style="color:var(--solar)">${wwDailySolar}</p><p class="metric-sub">MWh/day · June avg</p></div>
+    <div class="metric"><p class="metric-label">Daily total generation</p><p class="metric-value" style="color:var(--combined)">${wwTotalGen}</p><p class="metric-sub">MWh/day · wind + solar</p></div>
+    <div class="metric"><p class="metric-label">Daily demand</p><p class="metric-value">${dailyDemand.toFixed(1)}</p><p class="metric-sub">MWh/day · 2060 ${globalDemandScenario}</p></div>
+    <div class="metric"><p class="metric-label">${wwBalance >= 0 ? 'Daily surplus' : 'Daily deficit'}</p><p class="metric-value" style="color:${wwBalance >= 0 ? '#2a9d8f' : '#e76f51'}">${Math.abs(wwBalance).toFixed(1)}</p><p class="metric-sub">${wwBalance >= 0 ? 'MWh → export/store ✓' : 'MWh → grid/battery'}</p></div>
+    <div class="metric"><p class="metric-label">Battery (${wwBattDuration}hr LFP)</p><p class="metric-value" style="color:var(--solar)">${wwBattery} MWh</p><p class="metric-sub">${wwBattPowerMW} MW · ${wwBattDuration}-hr LFP</p></div>
+    <div class="metric"><p class="metric-label">Wind + Solar CAPEX</p><p class="metric-value" style="color:var(--text)">£${wwTotalCapex}M</p><p class="metric-sub">excl. battery storage</p></div>
+  `;
+  if(wwChart) wwChart.destroy();
+  wwChart = new Chart(document.getElementById('wwChart'),{
+    type:'line',
+    plugins:[makeShadingPlugin('Combined','Demand')],
+    data:{ labels:hours, datasets:[
+      { label:'Wind', data:wOut, borderColor:'#2a9d8f', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Solar', data:sOut, borderColor:'#e9c46a', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Combined', data:cOut, borderColor:'#8b5cf6', borderWidth:2.5, pointRadius:0, tension:0, fill:false },
+      { label:'Demand', data:demand, borderColor:'#e76f51', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:0, fill:false }
+    ]},
+    options:{...getBaseOpts(), plugins:{...getBaseOpts().plugins,tooltip:{filter:ctx=>ctx.datasetIndex<=3}}, scales:{...getBaseOpts().scales,y:{...getBaseOpts().scales.y,title:{display:true,text:'MWh / hour',color:tickColor(),font:{size:11}}}}}
+  });
+}
+
+// ===== TAB 5: WORST SOLAR =====
+let wsChart;
+function updateWS(){
+  const wMW = globalWindMW;
+  const sMW = globalSolarMW;
+  document.getElementById('ws_windVal').innerHTML = `${wMW} MW <span style="font-size:10px;color:var(--muted)">(${turbineCount(wMW)} turbines)</span>`;
+  document.getElementById('ws_solarVal').textContent = `${sMW} MW`;
+  const wOut = makeHourlyData(wsWindH, wMW);
+  const sOut = makeHourlyData(wsSolarH, sMW);
+  const cOut = wOut.map((w,i)=>+(w+sOut[i]).toFixed(2));
+
+  // Use correct monthly CF values (index 11 = December) for accurate daily totals
+  const wsDailyWind  = +(windMonthly[11]/100 * wMW * 24).toFixed(1);
+  const wsDailySolar = +(solarMonthly[11]/100 * sMW * 24).toFixed(1);
+  const wsTotalGen   = +(wsDailyWind + wsDailySolar).toFixed(1);
+  const wsBalance    = wsTotalGen - dailyDemand;
+  const wsDailyDeficit = Math.max(0, dailyDemand - wsTotalGen).toFixed(1);
+  const wsCapex = +((globalWindMW * 1000 * 1588 + globalSolarMW * 1000 * 659) / 1e6).toFixed(2);
+
+  const wsBattery = (() => {
+    const net = Array.from({length:24}, (_,h) => wsWindH[h]/100*wMW + wsSolarH[h]/100*sMW - demand[h]);
+    const net2 = [...net,...net];
+    let maxD = 0, run = 0;
+    for (let i = 0; i < 48; i++) { run += net2[i]; if(run<0){if(Math.abs(run)>maxD)maxD=Math.abs(run);}else run=0; }
+    return maxD.toFixed(1);
+  })();
+
+  const wsBattDuration = (() => {
+    const net = Array.from({length:24}, (_,h) => wsWindH[h]/100*wMW + wsSolarH[h]/100*sMW - demand[h]);
+    let maxHrs=0, cur=0;
+    net.forEach(n=>{ if(n<0){cur++;if(cur>maxHrs)maxHrs=cur;}else cur=0; });
+    return maxHrs || 1;
+  })();
+  const wsBattPowerMW = wsBattery > 0 ? +(parseFloat(wsBattery)/wsBattDuration).toFixed(2) : 0;
+  const wsBattCapex   = +(wsBattPowerMW * 0.65).toFixed(2);
+  const wsTotalCapex  = wsCapex;
+
+  document.getElementById('ws_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Daily wind output</p><p class="metric-value" style="color:var(--wind)">${wsDailyWind}</p><p class="metric-sub">MWh/day · Dec avg</p></div>
+    <div class="metric"><p class="metric-label">Daily solar output</p><p class="metric-value" style="color:var(--solar)">${wsDailySolar}</p><p class="metric-sub">MWh/day · Dec avg</p></div>
+    <div class="metric"><p class="metric-label">Daily total generation</p><p class="metric-value" style="color:var(--combined)">${wsTotalGen}</p><p class="metric-sub">MWh/day · wind + solar</p></div>
+    <div class="metric"><p class="metric-label">Daily demand</p><p class="metric-value">${dailyDemand.toFixed(1)}</p><p class="metric-sub">MWh/day · 2060 ${globalDemandScenario}</p></div>
+    <div class="metric"><p class="metric-label">${wsBalance >= 0 ? 'Daily surplus' : 'Daily deficit'}</p><p class="metric-value" style="color:${wsBalance >= 0 ? '#2a9d8f' : '#e76f51'}">${Math.abs(wsBalance).toFixed(1)}</p><p class="metric-sub">${wsBalance >= 0 ? 'MWh → export/store ✓' : 'MWh → grid/battery'}</p></div>
+    <div class="metric"><p class="metric-label">Battery (${wsBattDuration}hr LFP)</p><p class="metric-value" style="color:var(--solar)">${wsBattery} MWh</p><p class="metric-sub">${wsBattPowerMW} MW · ${wsBattDuration}-hr LFP</p></div>
+    <div class="metric"><p class="metric-label">Wind + Solar CAPEX</p><p class="metric-value" style="color:var(--text)">£${wsTotalCapex}M</p><p class="metric-sub">excl. battery storage</p></div>
+  `;
+  if(wsChart) wsChart.destroy();
+  wsChart = new Chart(document.getElementById('wsChart'),{
+    type:'line',
+    plugins:[makeShadingPlugin('Combined','Demand')],
+    data:{ labels:hours, datasets:[
+      { label:'Wind', data:wOut, borderColor:'#2a9d8f', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Solar', data:sOut, borderColor:'#e9c46a', borderWidth:2, pointRadius:0, tension:0, fill:false },
+      { label:'Combined', data:cOut, borderColor:'#8b5cf6', borderWidth:2.5, pointRadius:0, tension:0, fill:false },
+      { label:'Demand', data:demand, borderColor:'#e76f51', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:0, fill:false }
+    ]},
+    options:{...getBaseOpts(), plugins:{...getBaseOpts().plugins,tooltip:{filter:ctx=>ctx.datasetIndex<=3}}, scales:{...getBaseOpts().scales,y:{...getBaseOpts().scales.y,title:{display:true,text:'MWh / hour',color:tickColor(),font:{size:11}}}}}
+  });
+}
+
+// ===== TAB 6: CAPACITY OPTIMISATION =====
+let wCF_m=[43.22,47.28,41.75,32.37,28.91,27.51,28.04,30.29,32.15,38.89,40.45,44.54]; // updated by syncTurbine
+const sCF_m=[4.33,7.71,12.21,17.74,19.64,20.48,19.86,18.66,15.42,9.99,5.04,2.70];
+let OPT_DEM=195.4;
+const WCAP2=1588,SCAP2=659,SLAND2=2.25,LCOST=20000;
+const OPT_WMAX=38,OPT_SMAX=44;
+const OPT_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const OPT_DEM_LABELS={center:'Centre — 195.4 MWh/day',lower:'Lower — 133.8 MWh/day',upper:'Upper — 257.3 MWh/day'};
+const OPT_DEM_VALUES={center:195.4,lower:133.8,upper:257.3};
+
+function minSolarFull(w){
+  let mx=0,bm=0;
+  for(let m=0;m<12;m++){
+    const def=OPT_DEM-wCF_m[m]/100*w*24;
+    if(def<=0) continue;
+    const s=sCF_m[m]>0?def/(sCF_m[m]/100*24):9999;
+    if(s>mx){mx=s;bm=m;}
+  }
+  return {s:mx,bm};
+}
+
+function optTotalCost(w,s){ return +((w*1000*WCAP2+s*1000*SCAP2)/1e6+s*SLAND2*LCOST/1e6).toFixed(2); }
+function optCapex(w,s){ return +((w*1000*WCAP2+s*1000*SCAP2)/1e6).toFixed(2); }
+function optWindCapex(w){ return +(w*1000*WCAP2/1e6).toFixed(2); }
+function optSolCapex(s){ return +(s*1000*SCAP2/1e6).toFixed(2); }
+
+// Build boundary and contours dynamically based on current OPT_DEM
+let optBound=[], costDS=[], landDS2=[];
+const costLevels=[38,42,46,50,54,58];
+const landLevels2=[10,20,30,40,50,60,70,80];
+
+function buildOptData(){
+  // Feasibility boundary
+  optBound.length=0;
+  for(let w=0;w<=OPT_WMAX;w+=2){
+    const {s}=minSolarFull(w);
+    if(s<=OPT_SMAX+0.5) optBound.push({x:w,y:+Math.min(s,OPT_SMAX).toFixed(3)});
+  }
+  // Cost contours
+  costDS.length=0;
+  costLevels.forEach(tot=>{
+    const pts=[];
+    for(let w=0;w<=OPT_WMAX;w+=0.5){
+      const s=(tot-w*1.588)/0.704;
+      if(s>=0&&s<=OPT_SMAX) pts.push({x:+w.toFixed(1),y:+s.toFixed(2)});
+    }
+    costDS.push({label:'£'+tot+'M',data:pts,borderColor:'#7F77DD',borderWidth:1.3,
+           borderDash:[],pointRadius:0,showLine:true,tension:0,fill:false,order:4});
+  });
+  // Land contours
+  landDS2.length=0;
+  landLevels2.forEach(ha=>{
+    const s=ha/SLAND2;
+    if(s>OPT_SMAX) return;
+    landDS2.push({label:ha+'ha',data:[{x:0,y:+s.toFixed(2)},{x:OPT_WMAX,y:+s.toFixed(2)}],
+           borderColor:'rgba(29,158,117,0.55)',borderWidth:1,borderDash:[4,4],
+           pointRadius:0,showLine:true,tension:0,fill:false,order:5});
+  });
+}
+buildOptData(); // initial build
+
+let optChartInst=null;
+
+function buildOptChart(){
+  if(optChartInst){ optChartInst.destroy(); optChartInst=null; }
+  const isDark=!document.body.classList.contains('light-mode');
+  optChartInst=new Chart(document.getElementById('optChart'),{
+    type:'scatter',
+    data:{datasets:[
+
+
+      // Feasibility boundary with dots at each 2MW point
+      {label:'Boundary',data:optBound,borderColor:'#378ADD',borderWidth:2.5,
+       backgroundColor:'#378ADD',showLine:true,fill:false,tension:0,
+       pointRadius:3,pointHoverRadius:5,
+       pointBackgroundColor:'#378ADD',pointBorderColor:'#fff',pointBorderWidth:1,
+       order:3},
+      ...costDS,
+      ...landDS2
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      onHover:(evt)=>{ updateOptReadout(evt); },
+      onClick:(evt)=>{ applyOptClick(evt); },
+      scales:{
+        x:{type:'linear',title:{display:true,text:'Wind capacity (MW)',color:tickColor(),font:{size:12}},
+           min:0,max:OPT_WMAX,ticks:{stepSize:4,color:tickColor(),font:{size:11}},
+           grid:{color:gridColor()}},
+        y:{type:'linear',title:{display:true,text:'Solar capacity (MW)',color:tickColor(),font:{size:12}},
+           min:0,max:OPT_SMAX,ticks:{stepSize:4,color:'#888780',font:{size:11}},
+           grid:{color:'rgba(136,135,128,0.12)'}}
+      }
+    },
+    plugins:[{
+      id:'infeasShade',
+      beforeDraw(chart){
+        const ctx=chart.ctx, xs=chart.scales.x, ys=chart.scales.y;
+        ctx.save();
+        ctx.fillStyle='rgba(180,40,40,0.18)';
+        ctx.beginPath();
+        // Start top-left corner
+        ctx.moveTo(xs.getPixelForValue(0), ys.getPixelForValue(OPT_SMAX));
+        // Across top to boundary start x
+        ctx.lineTo(xs.getPixelForValue(optBound[0].x), ys.getPixelForValue(OPT_SMAX));
+        // Down boundary points
+        optBound.forEach(p => ctx.lineTo(xs.getPixelForValue(p.x), ys.getPixelForValue(p.y)));
+        // Bottom-left corner
+        ctx.lineTo(xs.getPixelForValue(0), ys.getPixelForValue(0));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    },{
+      id:'optLabels',
+      afterDraw(chart){
+        const ctx=chart.ctx,xs=chart.scales.x,ys=chart.scales.y;
+        ctx.save();
+        // Cost contour labels — find a mid-line position inside chart bounds
+        costLevels.forEach(tot=>{
+          // Walk w from 0 to WMAX and find a point where s is in [2, SMAX-2]
+          let labelW=null, labelS=null;
+          for(let w=2; w<=OPT_WMAX-2; w+=1){
+            const s=(tot-w*1.588)/0.704;
+            if(s>=2 && s<=OPT_SMAX-2){ labelW=w; labelS=s; break; }
+          }
+          if(labelW===null) return;
+          const px=xs.getPixelForValue(labelW);
+          const py=ys.getPixelForValue(labelS);
+          const label='£'+tot+'M';
+          ctx.font='bold 10px sans-serif';
+          const tw=ctx.measureText(label).width;
+          // Background pill
+          ctx.fillStyle=isLightMode()?'rgba(255,255,255,0.92)':'rgba(18,20,32,0.82)';
+          ctx.beginPath();
+          ctx.roundRect(px-3, py-13, tw+6, 15, 3);
+          ctx.fill();
+          ctx.fillStyle='#9F9CE8';
+          ctx.textAlign='left';
+          ctx.fillText(label, px, py-2);
+        });
+        // Land labels at right edge
+        landLevels2.forEach(ha=>{
+          const s=ha/SLAND2;if(s>OPT_SMAX)return;
+          const px=xs.getPixelForValue(OPT_WMAX-0.5),py=ys.getPixelForValue(s);
+          ctx.font='10px sans-serif';ctx.fillStyle='rgba(29,158,117,0.9)';
+          ctx.textAlign='right';ctx.fillText(ha+' ha',px,py-5);
+        });
+        // Region labels
+        ctx.textAlign='center';
+        ctx.font='bold 12px sans-serif';
+        ctx.fillStyle='rgba(200,60,60,0.5)';
+        ctx.fillText('INFEASIBLE',xs.getPixelForValue(6),ys.getPixelForValue(34));
+        ctx.font='10px sans-serif';
+        ctx.fillText('demand not met',xs.getPixelForValue(6),ys.getPixelForValue(30.5));
+        ctx.font='bold 12px sans-serif';
+        ctx.fillStyle='rgba(40,150,100,0.4)';
+        ctx.fillText('FEASIBLE',xs.getPixelForValue(30),ys.getPixelForValue(34));
+        ctx.font='10px sans-serif';
+        ctx.fillText('demand met',xs.getPixelForValue(30),ys.getPixelForValue(30.5));
+        ctx.restore();
+      }
+    },{
+      id:'selectedPt',
+      afterDraw(chart){
+        if(!optSelectedPoint) return;
+        const ctx=chart.ctx, xs=chart.scales.x, ys=chart.scales.y;
+        const px=xs.getPixelForValue(optSelectedPoint.x);
+        const py=ys.getPixelForValue(optSelectedPoint.y);
+        ctx.save();
+        // Outer glow ring
+        ctx.beginPath();
+        ctx.arc(px,py,10,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,0.15)';
+        ctx.fill();
+        // White ring
+        ctx.beginPath();
+        ctx.arc(px,py,7,0,Math.PI*2);
+        ctx.strokeStyle='#ffffff';
+        ctx.lineWidth=2;
+        ctx.stroke();
+        // Filled dot
+        ctx.beginPath();
+        ctx.arc(px,py,5,0,Math.PI*2);
+        ctx.fillStyle='#378ADD';
+        ctx.fill();
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+// Render readout with -- placeholders when cursor is outside chart and nothing selected
+function renderOptReadoutBlank(){
+  const card = (label, val, sub) =>
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">'+label+'</div>'+
+      '<div style="font-size:16px;font-weight:600;color:var(--muted)">'+val+'</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+sub+'</div>'+
+    '</div>';
+  document.getElementById('opt_readout').innerHTML =
+    card('Wind capacity',   '--', 'move cursor over chart') +
+    card('Solar capacity',  '--', '--') +
+    card('Total cost',      '--', '--') +
+    card('Feasibility',     '--', '--') +
+    card('Lowest month',    '--', '--') +
+    card('Highest month',   '--', '--');
+}
+
+// Render readout for a given w (MW wind) and s (MW solar)
+function renderOptReadoutValues(w, s){
+  const wSnap=Math.round(w/2)*2;
+  const {s:minS,bm}=minSolarFull(wSnap);
+  const feasible=s>=minS-0.05;
+  const tc=optTotalCost(w,s);
+  const cp=optCapex(w,s);
+  const land=(s*SLAND2).toFixed(1);
+  const landCost=(s*SLAND2*LCOST/1e6).toFixed(2);
+  const turbs=w/2;
+  let worstVal=9999, worstM=0, bestVal=-9999, bestM=0;
+  for(let m=0;m<12;m++){
+    const gen=(wCF_m[m]/100*w*24)+(sCF_m[m]/100*s*24);
+    const bal=+(gen-OPT_DEM).toFixed(1);
+    if(bal<worstVal){worstVal=bal;worstM=m;}
+    if(bal>bestVal){bestVal=bal;bestM=m;}
+  }
+  const worstCol=worstVal>=0?'#2a9d8f':'#e76f51';
+  const bestCol=bestVal>=0?'#2a9d8f':'#e76f51';
+  const bestPrefix=bestVal>=0?'+':'';
+  const bestStatus=bestVal>=0?'surplus':'deficit';
+
+  document.getElementById('opt_readout').innerHTML=
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Wind capacity</div>'+
+      '<div style="font-size:16px;font-weight:600;color:var(--wind)">'+w.toFixed(1)+' MW</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+turbs+' turbines</div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Solar capacity</div>'+
+      '<div style="font-size:16px;font-weight:600;color:var(--solar)">'+s.toFixed(1)+' MW</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+land+' ha · £'+landCost+'M land</div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Total cost</div>'+
+      '<div style="font-size:16px;font-weight:600;color:var(--combined)">£'+tc+'M</div>'+
+      '<div style="color:var(--muted);font-size:10px">CAPEX £'+cp+'M + £'+landCost+'M land</div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Feasibility</div>'+
+      '<div style="font-size:16px;font-weight:600;color:'+(feasible?'#2a9d8f':'#e76f51')+'">'+(feasible?'&#10003; Feasible':'&#10007; Infeasible')+'</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+(feasible?'All 12 months met':'Fails '+OPT_MONTHS[bm])+'</div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Lowest month</div>'+
+      '<div style="font-size:16px;font-weight:600;color:'+worstCol+'">'+(worstVal>=0?'+':'')+worstVal+' MWh</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+OPT_MONTHS[worstM]+' · '+(worstVal>=0?'surplus':'deficit')+'</div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:11px;min-width:88px">'+
+      '<div style="color:var(--muted);margin-bottom:2px">Highest month</div>'+
+      '<div style="font-size:16px;font-weight:600;color:'+bestCol+'">'+bestPrefix+bestVal+' MWh</div>'+
+      '<div style="color:var(--muted);font-size:10px">'+OPT_MONTHS[bestM]+' · '+bestStatus+'</div>'+
+    '</div>';
+}
+
+function updateOptReadout(evt){
+  if(!optChartInst||!evt||!evt.native) return;
+  const rect=optChartInst.canvas.getBoundingClientRect();
+  const xs=optChartInst.scales.x,ys=optChartInst.scales.y;
+  const cx=evt.native.clientX-rect.left;
+  const cy=evt.native.clientY-rect.top;
+  // Check if cursor is inside the chart plot area
+  const ca=optChartInst.chartArea;
+  if(cx<ca.left||cx>ca.right||cy<ca.top||cy>ca.bottom){
+    // Outside — show selected point or blank
+    if(optSelectedPoint) renderOptReadoutValues(optSelectedPoint.x, optSelectedPoint.y);
+    else renderOptReadoutBlank();
+    return;
+  }
+  const rawW=xs.getValueForPixel(cx);
+  const rawS=ys.getValueForPixel(cy);
+  const wRaw=Math.max(0,Math.min(OPT_WMAX,rawW));
+  const w=Math.round(wRaw/2)*2;
+  const s=+Math.max(0,Math.min(OPT_SMAX,rawS)).toFixed(1);
+  renderOptReadoutValues(w, s);
+}
+
+
+// ===== ALL-MONTH HOURLY PROFILES (for dynamic Lowest Total Month tab) =====
+// Wind CF% by hour, for each month — V90 (scaled from annual shape, Jun/Dec = actual measured)
+const windMonthlyH_v90 = [
+  [42.55,41.73,41.18,40.75,40.18,38.75,38.01,38.69,40.04,41.41,42.89,44.58,45.76,46.23,46.16,46.03,45.8,45.32,45.31,45.98,46.12,45.56,44.65,43.6], // Jan
+  [46.55,45.65,45.05,44.58,43.95,42.39,41.58,42.32,43.8,45.3,46.92,48.77,50.06,50.57,50.49,50.35,50.1,49.58,49.57,50.3,50.45,49.84,48.85,47.7], // Feb
+  [41.11,40.31,39.78,39.37,38.81,37.43,36.72,37.37,38.67,40.0,41.43,43.07,44.21,44.66,44.59,44.46,44.24,43.78,43.77,44.41,44.55,44.01,43.13,42.12], // Mar
+  [31.87,31.25,30.84,30.52,30.09,29.02,28.47,28.98,29.99,31.01,32.12,33.39,34.27,34.62,34.57,34.47,34.3,33.94,33.94,34.44,34.54,34.12,33.44,32.66], // Apr
+  [28.46,27.91,27.55,27.26,26.88,25.92,25.42,25.88,26.78,27.7,28.69,29.82,30.61,30.92,30.87,30.79,30.63,30.32,30.31,30.75,30.85,30.48,29.87,29.17], // May
+  [29.12,28.19,27.45,26.74,25.81,22.49,21.7,24.45,26.64,27.87,28.84,29.83,30.8,31.55,32.01,32.03,31.41,29.78,28.91,31.03,32.8,32.4,31.57,30.47], // Jun
+  [27.61,27.07,26.72,26.44,26.07,25.14,24.66,25.1,25.97,26.86,27.82,28.92,29.69,29.99,29.95,29.86,29.71,29.4,29.4,29.83,29.92,29.56,28.97,28.29], // Jul
+  [29.82,29.25,28.86,28.56,28.16,27.16,26.64,27.11,28.06,29.02,30.06,31.24,32.07,32.4,32.35,32.26,32.1,31.76,31.75,32.22,32.32,31.93,31.29,30.56], // Aug
+  [31.65,31.04,30.63,30.31,29.89,28.82,28.27,28.78,29.78,30.8,31.9,33.16,34.04,34.39,34.33,34.24,34.07,33.71,33.7,34.2,34.31,33.89,33.22,32.44], // Sep
+  [38.29,37.55,37.06,36.67,36.15,34.87,34.2,34.81,36.03,37.26,38.59,40.12,41.18,41.6,41.53,41.41,41.21,40.78,40.77,41.37,41.5,41.0,40.18,39.24], // Oct
+  [39.83,39.06,38.54,38.14,37.6,36.26,35.57,36.21,37.47,38.75,40.14,41.72,42.83,43.27,43.2,43.08,42.86,42.42,42.41,43.03,43.17,42.64,41.79,40.81], // Nov
+  [42.3,41.81,41.64,41.81,42.13,42.84,43.67,44.05,44.2,42.98,41.96,42.8,44.35,44.84,45.4,47.78,49.59,49.33,48.24,47.14,46.33,45.58,44.58,43.58], // Dec
+];
+const windMonthlyH_v110 = [
+  [54.89,53.9,53.21,52.63,51.88,49.95,48.8,49.39,50.7,51.98,53.33,54.96,56.13,56.65,56.72,56.87,56.97,56.84,57.27,58.44,58.86,58.32,57.3,56.09], // Jan
+  [59.09,58.02,57.28,56.66,55.84,53.77,52.54,53.17,54.57,55.96,57.41,59.16,60.42,60.98,61.05,61.21,61.32,61.19,61.65,62.91,63.36,62.78,61.68,60.37], // Feb
+  [53.62,52.64,51.97,51.41,50.67,48.79,47.67,48.24,49.52,50.77,52.1,53.69,54.83,55.33,55.4,55.54,55.65,55.52,55.94,57.08,57.49,56.97,55.97,54.78], // Mar
+  [43.97,43.17,42.62,42.16,41.55,40.01,39.09,39.56,40.61,41.64,42.72,44.02,44.96,45.37,45.43,45.55,45.63,45.53,45.87,46.81,47.15,46.72,45.9,44.92], // Apr
+  [39.92,39.2,38.7,38.28,37.73,36.33,35.49,35.92,36.87,37.8,38.79,39.97,40.82,41.2,41.25,41.36,41.43,41.34,41.65,42.5,42.81,42.42,41.67,40.79], // May
+  [39.89,39.15,38.57,37.85,35.26,29.28,30.31,32.94,35.0,36.43,37.39,38.41,39.35,40.16,40.84,41.19,40.74,39.19,37.75,39.55,42.88,43.46,42.3,40.89], // Jun
+  [39.05,38.34,37.85,37.44,36.9,35.53,34.72,35.13,36.06,36.98,37.94,39.1,39.93,40.3,40.35,40.45,40.53,40.44,40.74,41.57,41.87,41.49,40.76,39.9], // Jul
+  [41.83,41.07,40.55,40.11,39.53,38.06,37.19,37.64,38.63,39.61,40.64,41.88,42.77,43.17,43.22,43.33,43.41,43.32,43.64,44.53,44.85,44.44,43.67,42.74], // Aug
+  [43.9,43.1,42.55,42.09,41.49,39.95,39.03,39.5,40.54,41.57,42.65,43.95,44.89,45.3,45.36,45.48,45.56,45.46,45.8,46.73,47.07,46.64,45.82,44.85], // Sep
+  [51.73,50.79,50.14,49.6,48.89,47.07,45.99,46.54,47.78,48.99,50.26,51.8,52.9,53.38,53.45,53.59,53.69,53.57,53.97,55.07,55.47,54.96,54.0,52.85], // Oct
+  [52.43,51.48,50.82,50.28,49.55,47.71,46.62,47.18,48.42,49.65,50.94,52.5,53.62,54.11,54.18,54.32,54.42,54.3,54.7,55.82,56.22,55.71,54.73,53.57], // Nov
+  [53.8,53.11,52.87,53.1,53.47,54.28,55.17,55.62,55.82,54.37,52.99,53.66,55.02,55.37,56.05,58.99,61.32,61.3,60.38,59.4,58.56,57.72,56.52,55.28], // Dec
+];
+// Solar CF% by hour, for each month (same for both turbines)
+const solarMonthlyH = [
+  [0,0,0,0,0.05,0.42,1.82,4.32,7.45,10.71,13.29,14.63,14.51,13.09,10.46,7.09,3.96,1.65,0.41,0.04,0,0,0,0], // Jan
+  [0,0,0,0,0.1,0.74,3.24,7.7,13.26,19.07,23.67,26.05,25.83,23.31,18.63,12.62,7.05,2.94,0.74,0.08,0,0,0,0], // Feb
+  [0,0,0,0,0.15,1.18,5.14,12.19,21.0,30.2,37.48,41.25,40.91,36.92,29.51,19.98,11.17,4.66,1.17,0.12,0,0,0,0], // Mar
+  [0,0,0,0,0.22,1.71,7.46,17.72,30.52,43.88,54.45,59.94,59.44,53.64,42.87,29.04,16.22,6.77,1.7,0.18,0,0,0,0], // Apr
+  [0,0,0,0,0.24,1.9,8.26,19.62,33.78,48.58,60.28,66.36,65.81,59.38,47.46,32.15,17.96,7.5,1.88,0.2,0,0,0,0], // May
+  [0,0,0,0,0.16,3.41,12.91,26.2,38.83,48.77,55.42,57.88,56.66,52.6,45.27,34.93,23.18,11.65,3.38,0.16,0,0,0,0], // Jun
+  [0,0,0,0,0.25,1.92,8.35,19.83,34.16,49.12,60.96,67.1,66.54,60.05,47.99,32.51,18.16,7.58,1.9,0.2,0,0,0,0], // Jul
+  [0,0,0,0,0.23,1.8,7.85,18.64,32.1,46.15,57.28,63.05,62.52,56.42,45.09,30.54,17.07,7.12,1.79,0.19,0,0,0,0], // Aug
+  [0,0,0,0,0.19,1.49,6.49,15.4,26.52,38.14,47.33,52.1,51.67,46.62,37.26,25.24,14.1,5.89,1.48,0.16,0,0,0,0], // Sep
+  [0,0,0,0,0.12,0.97,4.2,9.98,17.18,24.71,30.66,33.75,33.47,30.2,24.14,16.35,9.14,3.81,0.96,0.1,0,0,0,0], // Oct
+  [0,0,0,0,0.06,0.49,2.12,5.03,8.67,12.47,15.47,17.03,16.89,15.24,12.18,8.25,4.61,1.92,0.48,0.05,0,0,0,0], // Nov
+  [0,0,0,0,0,0,0,0,0.35,4.43,9.95,14.14,15.54,12.98,6.74,0.71,0,0,0,0,0,0,0,0], // Dec
+];
+
+// ===== TAB 6: LOWEST TOTAL MONTH (DYNAMIC) =====
+let ltChart;
+function updateLT(){
+  const wMW = globalWindMW;
+  const sMW = globalSolarMW;
+  document.getElementById('lt_windVal').innerHTML = `${wMW} MW <span style="font-size:10px;color:var(--muted)">(${turbineCount(wMW)} turbines)</span>`;
+  document.getElementById('lt_solarVal').textContent = `${sMW} MW`;
+
+  // Find the month with the lowest combined daily output for this w+s split
+  const windH_all = globalTurbine === 'v110' ? windMonthlyH_v110 : windMonthlyH_v90;
+  let lowestGen = Infinity, lowestM = 0;
+  for(let m = 0; m < 12; m++){
+    const dailyW = windMonthly[m]/100 * wMW * 24;
+    const dailyS = solarMonthly[m]/100 * sMW * 24;
+    const total = dailyW + dailyS;
+    if(total < lowestGen){ lowestGen = total; lowestM = m; }
+  }
+
+  const mName = months[lowestM];
+  const ltWindH  = windH_all[lowestM];
+  const ltSolarH = solarMonthlyH[lowestM];
+  const wOut = ltWindH.map(cf  => +(cf/100  * wMW).toFixed(2));
+  const sOut = ltSolarH.map(cf => +(cf/100  * sMW).toFixed(2));
+  const cOut = wOut.map((w,i)  => +(w + sOut[i]).toFixed(2));
+
+  const ltDailyWind  = +(windMonthly[lowestM]/100  * wMW * 24).toFixed(1);
+  const ltDailySolar = +(solarMonthly[lowestM]/100 * sMW * 24).toFixed(1);
+  const ltTotalGen   = +(ltDailyWind + ltDailySolar).toFixed(1);
+  const ltBalance    = +(ltTotalGen - dailyDemand).toFixed(1);
+
+  // Battery sizing (sliding window)
+  const ltBattery = (() => {
+    const net  = Array.from({length:24}, (_,h) => ltWindH[h]/100*wMW + ltSolarH[h]/100*sMW - demand[h]);
+    const net2 = [...net, ...net];
+    let maxD = 0, run = 0;
+    for(let i = 0; i < 48; i++){
+      run += net2[i];
+      if(run < 0){ if(Math.abs(run) > maxD) maxD = Math.abs(run); } else run = 0;
+    }
+    return maxD.toFixed(1);
+  })();
+  const ltBattDuration = (() => {
+    const net = Array.from({length:24}, (_,h) => ltWindH[h]/100*wMW + ltSolarH[h]/100*sMW - demand[h]);
+    let maxHrs = 0, cur = 0;
+    net.forEach(n => { if(n < 0){ cur++; if(cur > maxHrs) maxHrs = cur; } else cur = 0; });
+    return maxHrs || 1;
+  })();
+  const ltCapex = +((wMW*1000*1588 + sMW*1000*659)/1e6).toFixed(2);
+
+  // Update title & subtitle dynamically
+  const windCF_m  = windMonthly[lowestM].toFixed(1);
+  const solarCF_m = solarMonthly[lowestM].toFixed(1);
+  document.getElementById('lt_title').textContent =
+    `Lowest total output month — ${mName} (wind CF: ${windCF_m}%, solar CF: ${solarCF_m}%, 10-yr avg)`;
+  document.getElementById('lt_subtitle').textContent =
+    `Average hourly supply vs demand during the lowest combined output month for this wind/solar split · updates as sliders change`;
+
+  document.getElementById('lt_metrics').innerHTML = `
+    <div class="metric"><p class="metric-label">Lowest output month</p><p class="metric-value" style="color:var(--demand)">${mName}</p><p class="metric-sub">changes with slider split</p></div>
+    <div class="metric"><p class="metric-label">Daily wind output</p><p class="metric-value" style="color:var(--wind)">${ltDailyWind}</p><p class="metric-sub">MWh/day · ${mName} avg</p></div>
+    <div class="metric"><p class="metric-label">Daily solar output</p><p class="metric-value" style="color:var(--solar)">${ltDailySolar}</p><p class="metric-sub">MWh/day · ${mName} avg</p></div>
+    <div class="metric"><p class="metric-label">Daily total generation</p><p class="metric-value" style="color:var(--combined)">${ltTotalGen}</p><p class="metric-sub">MWh/day · wind + solar</p></div>
+    <div class="metric"><p class="metric-label">Daily demand</p><p class="metric-value">${dailyDemand.toFixed(1)}</p><p class="metric-sub">MWh/day · 2060 ${globalDemandScenario}</p></div>
+    <div class="metric"><p class="metric-label">${ltBalance >= 0 ? 'Daily surplus' : 'Daily deficit'}</p><p class="metric-value" style="color:${ltBalance >= 0 ? '#2a9d8f' : '#e76f51'}">${Math.abs(ltBalance).toFixed(1)}</p><p class="metric-sub">${ltBalance >= 0 ? 'MWh → export/store ✓' : 'MWh → grid/battery'}</p></div>
+    <div class="metric"><p class="metric-label">Battery (${ltBattDuration}hr LFP)</p><p class="metric-value" style="color:var(--solar)">${ltBattery} MWh</p><p class="metric-sub">${ltBattDuration}-hr LFP needed</p></div>
+    <div class="metric"><p class="metric-label">Wind + Solar CAPEX</p><p class="metric-value" style="color:var(--text)">£${ltCapex}M</p><p class="metric-sub">excl. battery storage</p></div>
+  `;
+
+  const balSign  = ltBalance >= 0 ? 'surplus' : 'deficit';
+  const windRole = windMonthly[lowestM] > solarMonthly[lowestM] ? 'wind-dominated' : 'solar-dominated';
+  document.getElementById('lt_insight').innerHTML =
+    `<strong>Key finding — ${mName} (lowest combined output for this split):</strong> ` +
+    `With ${wMW} MW wind and ${sMW} MW solar, ${mName} produces the least daily energy at <strong>${ltTotalGen} MWh/day</strong> ` +
+    `(wind CF ${windCF_m}%, solar CF ${solarCF_m}%). ` +
+    `This is a <strong>${windRole}</strong> month. ` +
+    `Daily balance vs demand: <strong>${ltBalance >= 0 ? '+' : ''}${ltBalance} MWh</strong> (${balSign}). ` +
+    `Battery storage of <strong>${ltBattery} MWh</strong> needed to bridge the overnight/low-generation gap. ` +
+    `Adjust the sliders to see how the critical month shifts between wind-scarce summer and solar-scarce winter.`;
+
+  if(ltChart) ltChart.destroy();
+  ltChart = new Chart(document.getElementById('ltChart'), {
+    type: 'line',
+    plugins: [makeShadingPlugin('Combined','Demand')],
+    data: { labels: hours, datasets: [
+      { label:'Wind',     data:wOut, borderColor:'#2a9d8f', borderWidth:2,   pointRadius:0, tension:0, fill:false },
+      { label:'Solar',    data:sOut, borderColor:'#e9c46a', borderWidth:2,   pointRadius:0, tension:0, fill:false },
+      { label:'Combined', data:cOut, borderColor:'#8b5cf6', borderWidth:2.5, pointRadius:0, tension:0, fill:false },
+      { label:'Demand',   data:demand, borderColor:'#e76f51', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:0, fill:false }
+    ]},
+    options: { ...baseOpts,
+      plugins: { ...getBaseOpts().plugins, tooltip:{ filter:ctx=>ctx.datasetIndex<=3 } },
+      scales: { ...getBaseOpts().scales, y: { ...getBaseOpts().scales.y, title:{ display:true, text:'MWh / hour', color:tickColor(), font:{size:11} } } }
+    }
+  });
+}
+
+// ===== BOUNDARY CLICK: snap to nearest boundary point & sync all sliders =====
+let optSelectedPoint = null;
+
+function applyOptClick(evt){
+  if(!optChartInst||!evt||!evt.native) return;
+  const rect = optChartInst.canvas.getBoundingClientRect();
+  const xs   = optChartInst.scales.x;
+  const ys   = optChartInst.scales.y;
+  const rawW = xs.getValueForPixel(evt.native.clientX - rect.left);
+  const rawS = ys.getValueForPixel(evt.native.clientY - rect.top);
+
+  // Find the closest boundary point (2MW steps)
+  let closestDist = Infinity, closestPt = null;
+  optBound.forEach(pt => {
+    const dx = pt.x - rawW;
+    const dy = pt.y - rawS;
+    const dist = dx*dx + dy*dy;
+    if(dist < closestDist){ closestDist = dist; closestPt = pt; }
+  });
+
+  // Only respond if click is within ~4 MW of the boundary
+  if(!closestPt || Math.sqrt(closestDist) > 4) return;
+
+  const windMW  = closestPt.x;           // already a 2MW multiple
+  const solarMW = Math.ceil(closestPt.y * 2) / 2; // round UP to next 0.5 MW
+
+  const clampedWind  = Math.max(2,  Math.min(50, windMW));
+  const clampedSolar = Math.max(0.5, Math.min(50, solarMW));
+
+  optSelectedPoint = { x: clampedWind, y: clampedSolar };
+
+  globalWindMW  = clampedWind;
+  globalSolarMW = clampedSolar;
+  windSliders.forEach(id  => { const el=document.getElementById(id);  if(el) el.value=clampedWind;  });
+  solarSliders.forEach(id => { const el=document.getElementById(id); if(el) el.value=clampedSolar; });
+
+  // Update all display labels
+  document.getElementById("sm_windVal").innerHTML   = clampedWind  + " MW <span style='font-size:10px;color:var(--muted)'>(" + turbineCount(clampedWind) + " turbines)</span>";
+  document.getElementById("sm_solarVal").textContent = clampedSolar + " MW";
+  document.getElementById("h_windVal").innerHTML    = clampedWind  + " MW <span style='font-size:10px;color:var(--muted)'>(" + turbineCount(clampedWind) + " turbines)</span>";
+  document.getElementById("h_solarVal").textContent  = clampedSolar + " MW";
+  document.getElementById("ww_windVal").innerHTML   = clampedWind  + " MW <span style='font-size:10px;color:var(--muted)'>(" + turbineCount(clampedWind) + " turbines)</span>";
+  document.getElementById("ww_solarVal").textContent = clampedSolar + " MW";
+  document.getElementById("ws_windVal").innerHTML   = clampedWind  + " MW <span style='font-size:10px;color:var(--muted)'>(" + turbineCount(clampedWind) + " turbines)</span>";
+  document.getElementById("ws_solarVal").textContent = clampedSolar + " MW";
+
+  updateStacked(); updateHourly(); updateWW(); updateWS(); updateLT();
+  optChartInst.update("none");
+}
+
+function updateCapex(){
+  // Sync OPT_DEM to current demand scenario and rebuild boundary/contours
+  OPT_DEM = OPT_DEM_VALUES[globalDemandScenario];
+  buildOptData();
+  // Update title, subtitle, insight with current demand
+  const demLabel = OPT_DEM_LABELS[globalDemandScenario];
+  const titleEl  = document.getElementById('capex_title');
+  const subEl    = document.getElementById('capex_subtitle');
+  const insightEl= document.getElementById('capex_insight');
+  if(titleEl)    titleEl.textContent  = 'Wind-solar capacity optimisation — feasibility, cost and land';
+  if(subEl)      subEl.textContent    = demLabel + ' satisfied in every month · ' + turbineProfiles[globalTurbine].label + ' · CAPEX + solar land acquisition contours · land @ £20,000/ha (Cambridgeshire arable)';
+  if(insightEl)  insightEl.innerHTML  = 'Move cursor over chart to explore combinations. <strong>Click any point on the blue boundary line</strong> to apply that wind + solar combination to all tabs. The blue line is the feasibility boundary — left of it, at least one month fails to meet <strong>' + OPT_DEM + ' MWh/day</strong>. Diagonal lines are total cost contours (CAPEX + land acquisition). Horizontal dashed lines show solar land in hectares.';
+  // Reset selected point so readout clears when demand changes
+  optSelectedPoint = null;
+  // Rebuild the chart fresh
+  buildOptChart();
+  // Attach mouseleave once
+  const canvas = document.getElementById('optChart');
+  if(!canvas._leaveListenerAdded){
+    canvas.addEventListener('mouseleave', ()=>{
+      if(optSelectedPoint) renderOptReadoutValues(optSelectedPoint.x, optSelectedPoint.y);
+      else renderOptReadoutBlank();
+    });
+    canvas._leaveListenerAdded = true;
+  }
+  renderOptReadoutBlank();
+}
+
+
+// ===== TAB SWITCHER =====
+function showTab(name){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  const idx = ['monthly','stacked','hourly','worstwind','worstsolar','lowesttotal','capex'].indexOf(name);
+  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+}
+
+// Init all with default values
+updateCF(); updateStacked(); updateHourly(); updateWW(); updateWS(); updateLT(); updateCapex();
+</script>
+</body>
+</html>
